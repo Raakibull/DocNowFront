@@ -55,15 +55,13 @@ const Doctor = () => {
 
                   <div className="mt-2">
                     <div className="j-exb text-2xl mt-2">{doc.name}</div>
-                    <div className="j-m mt-2 text-[18px] opacity-55 border-b-2 border-dotted pb-2">{doc.specialty}</div>
-                    {doc.phone && (
-                      <div className="j-m mt-2 text-[18px] opacity-55">{doc.phone}</div>
-                    )}
+                    <div className="j-m mt-2 text-[18px] opacity-55 border-t-2 border-dotted pb-2">{doc.specialty}</div>
+                    
                   </div>
 
                   <Link to={`/doctor/${doc._id}`}>
                     <div className="mt-2">
-                      <button className="btn btn-outline btn-primary w-full rounded-3xl text-blue-600 border-b-blue-600">
+                      <button className="btn btn-outline btn-primary w-full rounded-3xl text-blue-600 j-exb border-b-blue-600">
                         View Detail
                       </button>
                     </div>
