@@ -133,7 +133,10 @@ async function handleConfirmBooking() {
               }`}>
                 {doctor.available ? 'Available' : 'Not Available'}
               </div>
+              
             </div>
+            <div className="j-b text-[16px] ">Location: <span className="j-m ml-[4px]">{doctor.location}</span> </div>
+            <div className="j-b text-[16px]">Fees per visit :<span className="ml-[4px] j-exb">{doctor.consultation} tk</span></div>
           </div>
         </div>
       </section>
@@ -302,7 +305,6 @@ async function handleConfirmBooking() {
     <p className="j-m text-gray-400 text-sm mb-6">
       A confirmation was sent to {patientEmail}
     </p>
-
     {/* Summary card */}
     <div className="bg-gray-50 rounded-2xl p-5 text-left mb-6">
       <div className="j-b text-gray-400 text-xs mb-3 tracking-wide">APPOINTMENT SUMMARY</div>
