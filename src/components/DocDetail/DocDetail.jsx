@@ -23,6 +23,7 @@ const [patientName, setPatientName] = useState("");
 const [patientPhone, setPatientPhone] = useState("");
 const [patientEmail, setPatientEmail] = useState("");
 const [reason, setReason] = useState("");
+const [submitting, setSubmitting] = useState(false);
 
  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isValidPhone = (phone) => /^[0-9]{10,15}$/.test(phone);
@@ -48,7 +49,38 @@ const canConfirm =
 
 
 
-  
+
+
+async function handleConfirmBooking() {
+  setSubmitting(true);
+  try {
+    const res = await fetch(`${API_URL}/api/booking`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        doctorId: doctor._id,
+        doctorName: doctor.name,
+        patientName,
+        patientPhone,
+        patientEmail,
+        reason,
+        date: selectedDate,
+        time: selectedTime,
+      }),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      throw new Error(errData?.message || "Booking failed");
+    }
+
+    document.getElementById('con').showModal();
+  } catch (err) {
+    console.error("Booking failed:", err);
+    alert(err.message || "Something went wrong booking your appointment.");
+  }
+  setSubmitting(false);
+}
 
 
 
@@ -237,17 +269,16 @@ const canConfirm =
       <div className="flex justify-center mt-5">
 
       <button
-      type="button"
-       disabled={!canConfirm}
-  onClick={() => document.getElementById('con').showModal()}
+  type="button"
+  disabled={!canConfirm || submitting}
+  onClick={handleConfirmBooking}
   className={`btn j-b ${
-    canConfirm
-      ? "hover:bg-blue-600 hover:text-white"
-      : "opacity-40 cursor-not-allowed"
+    canConfirm ? "hover:bg-blue-600 hover:text-white" : "opacity-40 cursor-not-allowed"
   }`}
-      className='btn  hover:bg-blue-600 hover:text-white j-b '>
-      Confirm</button>
-      </div>``
+>
+  {submitting ? "Booking..." : "Confirm"}
+</button>
+      </div>
     </form></div>
 </div>
 
