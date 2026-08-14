@@ -1,22 +1,23 @@
 import { useState, useEffect, useRef } from "react";
 import logo from '../../components/material/logo2.png';
-
+ 
 const API_URL = import.meta.env.VITE_API_URL;
 const API = `${API_URL}/api/doctors`;
+const BOOKING_API = `${API_URL}/api/booking`;
 const UPLOADS = `${API_URL}/`;
-
+ 
 const initialForm = {
   name: "", specialty: "", email: "", phone: "",
   experience: "", bio: "", available: true, photo: null,
   consultation:"",location:'',availableDays:'',availableTime:'',
   qualification:'',regNumber:''
 };
-
+ 
 const SPECIALTIES = [
   "Cardiology", "Dermatology", "Neurology", "Orthopedics","gynecologist",
   "Pediatrics", "Psychiatry", "Radiology", "Surgery", "General Practice", "Other",
 ];
-
+ 
 export default function AdminDashboard() {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,16 +29,24 @@ export default function AdminDashboard() {
   const [toast, setToast] = useState(null);
   const [search, setSearch] = useState("");
   const fileRef = useRef();
-
-  useEffect(() => { fetchDoctors(); }, []);
-
+ 
+  // Bookings tab state
+  const [view, setView] = useState("doctors"); // "doctors" | "bookings"
+  const [bookings, setBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
+ 
+  useEffect(() => {
+    fetchDoctors();
+    fetchBookings();
+  }, []);
+ 
   useEffect(() => {
     if (toast) {
       const t = setTimeout(() => setToast(null), 3000);
       return () => clearTimeout(t);
     }
   }, [toast]);
-
+ 
   async function fetchDoctors() {
     setLoading(true);
     try {
@@ -49,17 +58,29 @@ export default function AdminDashboard() {
     }
     setLoading(false);
   }
-
+ 
+  async function fetchBookings() {
+    setBookingsLoading(true);
+    try {
+      const res = await fetch(BOOKING_API);
+      const data = await res.json();
+      setBookings(data);
+    } catch {
+      showToast("Failed to load bookings", "error");
+    }
+    setBookingsLoading(false);
+  }
+ 
   function showToast(msg, type = "success") {
     setToast({ msg, type });
   }
-
+ 
   function openAdd() {
     setForm(initialForm);
     setPreview(null);
     setModal("add");
   }
-
+ 
   function openEdit(doc) {
     setSelected(doc);
     setForm({
@@ -77,37 +98,37 @@ export default function AdminDashboard() {
       availableTime:doc.availableTime||'',
       qualification:doc.qualification||'',
       regNumber:doc.regNumber||'',
-
+ 
       
     });
     setPreview(doc.photo ? UPLOADS + doc.photo : null);
     setModal("edit");
   }
-
+ 
   function openDelete(doc) {
     setSelected(doc);
     setModal("delete");
   }
-
+ 
   function closeModal() {
     setModal(null);
     setSelected(null);
     setForm(initialForm);
     setPreview(null);
   }
-
+ 
   function handleChange(e) {
     const { name, value, type, checked } = e.target;
     setForm(f => ({ ...f, [name]: type === "checkbox" ? checked : value }));
   }
-
+ 
   function handleFile(e) {
     const file = e.target.files[0];
     if (!file) return;
     setForm(f => ({ ...f, photo: file }));
     setPreview(URL.createObjectURL(file));
   }
-
+ 
   async function handleSubmit() {
     if (!form.name || !form.specialty || !form.email) {
       showToast("Name, specialty and email are required", "error");
@@ -132,7 +153,7 @@ export default function AdminDashboard() {
     }
     setSaving(false);
   }
-
+ 
   async function handleDelete() {
     setSaving(true);
     try {
@@ -145,124 +166,198 @@ export default function AdminDashboard() {
     }
     setSaving(false);
   }
-
+ 
   const filtered = doctors.filter(d =>
     d.name?.toLowerCase().includes(search.toLowerCase()) ||
     d.specialty?.toLowerCase().includes(search.toLowerCase())
   );
-
+ 
   const initials = (name) =>
     name?.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase() || "DR";
-
+ 
   const avatarColor = (name) => {
     const colors = ["#3B6D11", "#185FA5", "#854F0B", "#3C3489", "#0F6E56", "#993556"];
     let h = 0;
     for (let c of (name || "")) h = c.charCodeAt(0) + ((h << 5) - h);
     return colors[Math.abs(h) % colors.length];
   };
-
+ 
   return (
     <div style={s.page}>
-
+ 
       {/* Sidebar */}
       <aside className="px-18 py-40 bg-blue-600">
         <div className=" flex gap-3">
           <img className="w-12" src={logo} alt="" />  <div className="text-2xl pt-2 j-exb">DocNow</div>
         </div>
       </aside>
-
+ 
       {/* Main */}
       <main style={s.main}>
-
+ 
         {/* Header */}
         <header style={s.header}>
           <div>
-            <h1 style={s.pageTitle}>Doctor Profiles</h1>
-            <p style={s.pageSub}>{doctors.length} registered doctors</p>
+            <h1 style={s.pageTitle}>{view === "doctors" ? "Doctor Profiles" : "Appointments"}</h1>
+            <p style={s.pageSub}>
+              {view === "doctors"
+                ? `${doctors.length} registered doctors`
+                : `${bookings.length} total bookings`}
+            </p>
           </div>
-          <button style={s.addBtn} onClick={openAdd}>+ Add Doctor</button>
+          {view === "doctors" && (
+            <button style={s.addBtn} onClick={openAdd}>+ Add Doctor</button>
+          )}
         </header>
-
-        {/* Search */}
-        <div style={s.searchWrap}>
-          <input
-            style={s.search}
-            placeholder="Search by name or specialty..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+ 
+        {/* Tabs */}
+        <div style={{ display: "flex", gap: 10, marginBottom: "1.5rem" }}>
+          <button
+            onClick={() => setView("doctors")}
+            style={{
+              padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer",
+              fontWeight: 600, fontSize: 14,
+              background: view === "doctors" ? "#1D9E75" : "#EEE",
+              color: view === "doctors" ? "#fff" : "#555",
+            }}
+          >
+            Doctors
+          </button>
+          <button
+            onClick={() => setView("bookings")}
+            style={{
+              padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer",
+              fontWeight: 600, fontSize: 14,
+              background: view === "bookings" ? "#1D9E75" : "#EEE",
+              color: view === "bookings" ? "#fff" : "#555",
+            }}
+          >
+            Bookings ({bookings.length})
+          </button>
         </div>
-
-        {/* Stats */}
-        <div style={s.statsRow}>
-          <div style={s.stat}>
-            <span style={s.statNum}>{doctors.length}</span>
-            <span style={s.statLabel}>Total Doctors</span>
-          </div>
-          <div style={s.stat}>
-            <span style={s.statNum}>{doctors.filter(d => d.available).length}</span>
-            <span style={s.statLabel}>Available</span>
-          </div>
-          <div style={s.stat}>
-            <span style={s.statNum}>{doctors.filter(d => !d.available).length}</span>
-            <span style={s.statLabel}>Unavailable</span>
-          </div>
-          <div style={s.stat}>
-            <span style={s.statNum}>{[...new Set(doctors.map(d => d.specialty))].length}</span>
-            <span style={s.statLabel}>Specialties</span>
-          </div>
-        </div>
-
-        {/* Doctor Cards */}
-        {loading ? (
-          <div style={s.empty}>Loading doctors...</div>
-        ) : filtered.length === 0 ? (
-          <div style={s.empty}>
-            {search ? "No doctors match your search." : "No doctors yet. Click + Add Doctor to get started."}
-          </div>
-        ) : (
-          <div style={s.grid}>
-            {filtered.map(doc => (
-              <div key={doc._id} style={s.card}>
-                <div style={s.cardTop}>
-                  {doc.photo ? (
-                    <img src={UPLOADS + doc.photo} alt={doc.name} style={s.avatar} />
-                  ) : (
-                    <div style={{ ...s.avatarInitials, background: avatarColor(doc.name) }}>
-                      {initials(doc.name)}
-                    </div>
-                  )}
-                  <div style={{
-                    ...s.badge,
-                    background: doc.available ? "#EAF3DE" : "#FCEBEB",
-                    color: doc.available ? "#3B6D11" : "#A32D2D",
-                  }}>
-                    {doc.available ? "Available" : "Unavailable"}
-                  </div>
-                </div>
-                <div style={s.cardBody}>
-                  <h3 style={s.docName}>{doc.name}</h3>
-                  <p style={s.docSpec}>{doc.specialty}</p>
-                  {doc.experience && (
-                    <p style={s.docMeta}>{doc.experience} yrs experience</p>
-                  )}
-                  {doc.email && (
-                    <p style={s.docMeta}>{doc.email}</p>
-                  )}
-                  {doc.bio && (
-                    <p style={s.docBio}>{doc.bio}</p>
-                  )}
-                </div>
-                <div style={s.cardActions}>
-                  <button style={s.editBtn} onClick={() => openEdit(doc)}>Edit</button>
-                  <button style={s.deleteBtn} onClick={() => openDelete(doc)}>Delete</button>
-                </div>
+ 
+        {view === "doctors" && (
+          <>
+            {/* Search */}
+            <div style={s.searchWrap}>
+              <input
+                style={s.search}
+                placeholder="Search by name or specialty..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+ 
+            {/* Stats */}
+            <div style={s.statsRow}>
+              <div style={s.stat}>
+                <span style={s.statNum}>{doctors.length}</span>
+                <span style={s.statLabel}>Total Doctors</span>
               </div>
-            ))}
+              <div style={s.stat}>
+                <span style={s.statNum}>{doctors.filter(d => d.available).length}</span>
+                <span style={s.statLabel}>Available</span>
+              </div>
+              <div style={s.stat}>
+                <span style={s.statNum}>{doctors.filter(d => !d.available).length}</span>
+                <span style={s.statLabel}>Unavailable</span>
+              </div>
+              <div style={s.stat}>
+                <span style={s.statNum}>{[...new Set(doctors.map(d => d.specialty))].length}</span>
+                <span style={s.statLabel}>Specialties</span>
+              </div>
+            </div>
+ 
+            {/* Doctor Cards */}
+            {loading ? (
+              <div style={s.empty}>Loading doctors...</div>
+            ) : filtered.length === 0 ? (
+              <div style={s.empty}>
+                {search ? "No doctors match your search." : "No doctors yet. Click + Add Doctor to get started."}
+              </div>
+            ) : (
+              <div style={s.grid}>
+                {filtered.map(doc => (
+                  <div key={doc._id} style={s.card}>
+                    <div style={s.cardTop}>
+                      {doc.photo ? (
+                        <img src={UPLOADS + doc.photo} alt={doc.name} style={s.avatar} />
+                      ) : (
+                        <div style={{ ...s.avatarInitials, background: avatarColor(doc.name) }}>
+                          {initials(doc.name)}
+                        </div>
+                      )}
+                      <div style={{
+                        ...s.badge,
+                        background: doc.available ? "#EAF3DE" : "#FCEBEB",
+                        color: doc.available ? "#3B6D11" : "#A32D2D",
+                      }}>
+                        {doc.available ? "Available" : "Unavailable"}
+                      </div>
+                    </div>
+                    <div style={s.cardBody}>
+                      <h3 style={s.docName}>{doc.name}</h3>
+                      <p style={s.docSpec}>{doc.specialty}</p>
+                      {doc.experience && (
+                        <p style={s.docMeta}>{doc.experience} yrs experience</p>
+                      )}
+                      {doc.email && (
+                        <p style={s.docMeta}>{doc.email}</p>
+                      )}
+                      {doc.bio && (
+                        <p style={s.docBio}>{doc.bio}</p>
+                      )}
+                    </div>
+                    <div style={s.cardActions}>
+                      <button style={s.editBtn} onClick={() => openEdit(doc)}>Edit</button>
+                      <button style={s.deleteBtn} onClick={() => openDelete(doc)}>Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+ 
+        {view === "bookings" && (
+          <div>
+            {bookingsLoading ? (
+              <div style={s.empty}>Loading bookings...</div>
+            ) : bookings.length === 0 ? (
+              <div style={s.empty}>No bookings yet.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {bookings.map(b => (
+                  <div key={b._id} style={{
+                    background: "#fff", borderRadius: 12, border: "1px solid #EBEBEB",
+                    padding: "1.2rem 1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center",
+                    flexWrap: "wrap", gap: 12,
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>{b.patientName}</div>
+                      <div style={{ fontSize: 13, color: "#888" }}>{b.patientPhone} · {b.patientEmail}</div>
+                      {b.reason && <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>Reason: {b.reason}</div>}
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{b.doctorName}</div>
+                      <div style={{ fontSize: 13, color: "#888" }}>{b.date}, {b.time}</div>
+                      <div style={{
+                        marginTop: 6, display: "inline-block", fontSize: 11, fontWeight: 600,
+                        padding: "3px 10px", borderRadius: 20,
+                        background: b.status === "confirmed" ? "#EAF3DE" : b.status === "cancelled" ? "#FCEBEB" : "#FFF3D6",
+                        color: b.status === "confirmed" ? "#3B6D11" : b.status === "cancelled" ? "#A32D2D" : "#8A6D1D",
+                      }}>
+                        {b.status}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
-
+ 
       {/* Add / Edit Modal */}
       {(modal === "add" || modal === "edit") && (
         <div style={s.overlay} onClick={closeModal}>
@@ -272,7 +367,7 @@ export default function AdminDashboard() {
               <button style={s.closeBtn} onClick={closeModal}>✕</button>
             </div>
             <div style={s.modalBody}>
-
+ 
               {/* Photo Upload */}
               <div style={s.photoUpload} onClick={() => fileRef.current.click()}>
                 {preview ? (
@@ -285,7 +380,7 @@ export default function AdminDashboard() {
                 )}
                 <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
               </div>
-
+ 
               <div style={s.formGrid}>
                 <div style={s.formGroup}>
                   <label style={s.label}>Full Name *</label>
@@ -318,12 +413,12 @@ export default function AdminDashboard() {
                   </label>
                 </div>
               </div>
-
+ 
               <div style={s.formGroup}>
   <label style={s.label}>Bio</label>
   <textarea style={{ ...s.input, height: 90, resize: "vertical" }} name="bio" value={form.bio} onChange={handleChange} placeholder="Brief description about the doctor..." />
 </div>
-
+ 
 {/* New Fields */}
 <div style={s.formGrid}>
   <div style={s.formGroup}>
@@ -343,18 +438,18 @@ export default function AdminDashboard() {
     <input style={s.input} name="availableTime" value={form.availableTime} onChange={handleChange} placeholder="10:00 AM - 5:00 PM" />
   </div>
 </div>
-
+ 
 <div style={s.formGroup}>
   <label style={s.label}>Location / Hospital</label>
   <input style={s.input} name="location" value={form.location} onChange={handleChange} placeholder="TMSS Medical College, Bogura" />
 </div>
-
+ 
 <div style={s.formGroup}>
   <label style={s.label}>Available Days</label>
   <input style={s.input} name="availableDays" value={form.availableDays} onChange={handleChange} placeholder="Sunday, Monday, Thursday" />
 </div>
             </div>
-
+ 
             <div style={s.modalFooter}>
               <button style={s.cancelBtn} onClick={closeModal}>Cancel</button>
               <button style={s.saveBtn} onClick={handleSubmit} disabled={saving}>
@@ -364,7 +459,7 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-
+ 
       {/* Delete Modal */}
       {modal === "delete" && (
         <div style={s.overlay} onClick={closeModal}>
@@ -388,7 +483,7 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-
+ 
       {/* Toast */}
       {toast && (
         <div style={{
@@ -401,7 +496,7 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
+ 
 const s = {
   page: { display: "flex", minHeight: "100vh", fontFamily: "system-ui, sans-serif", background: "#F8F8F6" },
   sidebar: { width: 220, background: "#0C1B2E", display: "flex", flexDirection: "column", padding: "1.5rem 1rem", flexShrink: 0 },
